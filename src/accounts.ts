@@ -1,4 +1,3 @@
-import { normalizeResolvedSecretInputString } from "openclaw/plugin-sdk";
 import {
   DEFAULT_ACCOUNT_ID,
   normalizeAccountId,
@@ -11,6 +10,14 @@ function normalizeOptionalInstagramAccountId(value?: string | null): string | nu
     return null;
   }
   return normalizeAccountId(trimmed);
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 function resolveAccountConfig(
@@ -73,15 +80,12 @@ export function resolveInstagramAccount(params: {
     normalizeOptionalInstagramAccountId(params.accountId) ??
     resolveDefaultInstagramAccountId(params.cfg);
   const config = mergeInstagramAccountConfig(params.cfg, accountId);
-  const cliPath = normalizeResolvedSecretInputString({
-    value: config.cliPath,
-    path: `channels.instagram.accounts.${accountId}.cliPath`,
-  }) || "instagram-cli";
+  const cliPath = normalizeOptionalString(config.cliPath) || "instagram-cli";
   const cliArgs = Array.isArray(config.cliArgs)
     ? config.cliArgs.map((value) => String(value)).filter(Boolean)
     : [];
-  const sessionUsername = config.sessionUsername?.trim() || undefined;
-  const cwd = config.cwd?.trim() || undefined;
+  const sessionUsername = normalizeOptionalString(config.sessionUsername);
+  const cwd = normalizeOptionalString(config.cwd);
   return {
     accountId,
     enabled: config.enabled !== false,
