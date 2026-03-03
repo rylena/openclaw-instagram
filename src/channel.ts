@@ -40,6 +40,15 @@ const meta = {
   quickstartAllowFrom: true,
 } as const;
 
+async function waitForAbortSignal(signal?: AbortSignal) {
+  if (!signal || signal.aborted) {
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    signal.addEventListener("abort", () => resolve(), { once: true });
+  });
+}
+
 function formatAllowEntry(entry: string): string {
   const username = normalizeInstagramUsername(entry);
   if (!username) {
@@ -267,7 +276,8 @@ export const instagramPlugin: ChannelPlugin<ResolvedInstagramAccount, InstagramP
         abortSignal: ctx.abortSignal,
         statusSink: (patch) => ctx.setStatus({ accountId: ctx.accountId, ...patch }),
       });
-      return { stop };
+      await waitForAbortSignal(ctx.abortSignal);
+      stop();
     },
   },
 };
