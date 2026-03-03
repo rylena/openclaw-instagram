@@ -4,6 +4,32 @@
   "description": "Standalone OpenClaw Instagram channel plugin powered by instagram-cli-4llm",
   "license": "MIT",
   "type": "module",
+  "files": [
+    "README.md",
+    "index.ts",
+    "openclaw.plugin.json",
+    "scripts/setup-local.mjs",
+    "scripts/instagram-bridge.ts",
+    "scripts/instagram-watch.ts",
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rylena/openclaw-instagram.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rylena/openclaw-instagram/issues"
+  },
+  "homepage": "https://github.com/rylena/openclaw-instagram#readme",
+  "keywords": [
+    "openclaw",
+    "instagram",
+    "plugin",
+    "automation"
+  ],
   "bin": {
     "openclaw-instagram-setup": "./scripts/setup-local.mjs"
   },
