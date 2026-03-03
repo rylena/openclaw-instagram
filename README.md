@@ -76,7 +76,9 @@ Minimal config:
       "sessionUsername": "your_instagram_username",
       "dmPolicy": "open",
       "allowFrom": ["*"],
-      "pollIntervalMs": 30000
+      "pollIntervalMs": 5000,
+      "historyLimit": 25,
+      "dmHistoryLimit": 10
     }
   }
 }
@@ -88,6 +90,7 @@ Minimal config:
 - Polling checkpoints are written under the OpenClaw state dir in `instagram/<account>.json`.
 - The plugin expects a working Instagram CLI session for the configured `sessionUsername`.
 - The quick installer defaults to `dmPolicy: "open"` with `allowFrom: ["*"]` so the bot can answer immediately after install.
+- The quick installer also defaults to a faster poll profile: `pollIntervalMs: 5000`, `historyLimit: 25`, `dmHistoryLimit: 10`.
 - Use a private Instagram account dedicated to automation and testing.
 - `openclaw plugins install` installs plugin dependencies automatically, but `instagram-cli-4llm`
   still needs its own dependencies installed.

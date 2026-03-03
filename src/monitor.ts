@@ -4,7 +4,7 @@ import { resolveInstagramAccount } from "./accounts.js";
 import { listInstagramMessages, listInstagramThreads, markInstagramThreadRead } from "./client.js";
 import { handleInstagramInbound } from "./inbound.js";
 import { getInstagramRuntime } from "./runtime.js";
-import type { CoreConfig, InstagramInboundMessage, InstagramPollState } from "./types.js";
+import type { CoreConfig, InstagramAccountConfig, InstagramInboundMessage, InstagramPollState } from "./types.js";
 
 export type InstagramMonitorOptions = {
   accountId?: string;
@@ -41,6 +41,49 @@ async function waitForDelay(ms: number, signal?: AbortSignal) {
   });
 }
 
+function resolveThreadScanLimit(config: InstagramAccountConfig): number {
+  const raw = Number(config?.historyLimit ?? 25);
+  if (!Number.isFinite(raw)) {
+    return 25;
+  }
+  return Math.max(5, Math.min(100, Math.trunc(raw)));
+}
+
+function resolveMessageScanLimit(config: InstagramAccountConfig): number {
+  const raw = Number(config?.dmHistoryLimit ?? 10);
+  if (!Number.isFinite(raw)) {
+    return 10;
+  }
+  return Math.max(5, Math.min(50, Math.trunc(raw)));
+}
+
+function resolvePollIntervalMs(config: InstagramAccountConfig): number {
+  const raw = Number(config?.pollIntervalMs ?? 5_000);
+  if (!Number.isFinite(raw)) {
+    return 5_000;
+  }
+  return Math.max(5_000, Math.min(300_000, Math.trunc(raw)));
+}
+
+function prioritizeThreads(
+  threads: Awaited<ReturnType<typeof listInstagramThreads>>,
+  state: InstagramPollState,
+  limit: number,
+) {
+  return [...threads]
+    .sort((left, right) => {
+      if (left.unread !== right.unread) {
+        return left.unread ? -1 : 1;
+      }
+      const leftSeen = state.threads[left.id]?.lastProcessedAt ?? 0;
+      const rightSeen = state.threads[right.id]?.lastProcessedAt ?? 0;
+      const leftActivity = left.lastActivity ? new Date(left.lastActivity).getTime() : 0;
+      const rightActivity = right.lastActivity ? new Date(right.lastActivity).getTime() : 0;
+      return Math.max(rightSeen, rightActivity) - Math.max(leftSeen, leftActivity);
+    })
+    .slice(0, limit);
+}
+
 export async function monitorInstagramProvider(
   opts: InstagramMonitorOptions,
 ): Promise<{ stop: () => void }> {
@@ -66,6 +109,9 @@ export async function monitorInstagramProvider(
     accountId: account.accountId,
   });
   const stateFile = resolveStateFile(account.accountId);
+  const threadScanLimit = resolveThreadScanLimit(account.config);
+  const messageScanLimit = resolveMessageScanLimit(account.config);
+  const pollIntervalMs = resolvePollIntervalMs(account.config);
   let stopped = false;
 
   const loop = async () => {
@@ -74,15 +120,15 @@ export async function monitorInstagramProvider(
     });
     while (!stopped && !opts.abortSignal?.aborted) {
       try {
-        const threads = await listInstagramThreads(account, { limit: 100 });
+        const threads = await listInstagramThreads(account, { limit: threadScanLimit });
         const now = Date.now();
         opts.statusSink?.({ lastPollAt: now, lastError: null });
 
-        for (const thread of threads) {
+        for (const thread of prioritizeThreads(threads, state, threadScanLimit)) {
           const threadState = state.threads[thread.id] ?? {};
           const { messages } = await listInstagramMessages(account, {
             threadId: thread.id,
-            limit: 50,
+            limit: messageScanLimit,
             since: threadState.lastTimestamp,
           });
           const ordered = messages
@@ -152,7 +198,7 @@ export async function monitorInstagramProvider(
         logger.error(`[${account.accountId}] Instagram monitor error: ${message}`);
         opts.statusSink?.({ lastError: message });
       }
-      await waitForDelay(account.config.pollIntervalMs ?? 30_000, opts.abortSignal);
+      await waitForDelay(pollIntervalMs, opts.abortSignal);
     }
   };
 

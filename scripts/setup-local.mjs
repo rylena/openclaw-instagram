@@ -194,7 +194,9 @@ const next = {
       sessionUsername: args.sessionUsername,
       dmPolicy: current.channels?.instagram?.dmPolicy ?? "open",
       allowFrom: current.channels?.instagram?.allowFrom ?? ["*"],
-      pollIntervalMs: current.channels?.instagram?.pollIntervalMs ?? 30000,
+      pollIntervalMs: current.channels?.instagram?.pollIntervalMs ?? 5000,
+      historyLimit: current.channels?.instagram?.historyLimit ?? 25,
+      dmHistoryLimit: current.channels?.instagram?.dmHistoryLimit ?? 10,
     },
   },
 };
@@ -210,6 +212,9 @@ console.log("");
 console.log("Default channel policy:");
 console.log('- dmPolicy: "open"');
 console.log('- allowFrom: ["*"]');
+console.log("- pollIntervalMs: 5000");
+console.log("- historyLimit: 25");
+console.log("- dmHistoryLimit: 10");
 console.log("");
 console.log("Next steps:");
 if (!args.igUsername.trim()) {
