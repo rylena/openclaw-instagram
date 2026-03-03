@@ -47,7 +47,17 @@ function buildInstagramCliArgv(
   const cliDir =
     dirFlagIndex >= 0 && dirFlagIndex + 1 < cliArgs.length ? String(cliArgs[dirFlagIndex + 1]) : "";
   if (cliPath === "pnpm" && cliDir && cliArgs.includes("exec")) {
-    const bridgeArgv = [cliPath, "--dir", cliDir, "exec", "tsx", bridgePath, "--cli-dir", cliDir];
+    const bridgeArgv = [
+      cliPath,
+      "--dir",
+      cliDir,
+      "exec",
+      "ts-node",
+      "--esm",
+      bridgePath,
+      "--cli-dir",
+      cliDir,
+    ];
     if (account.sessionUsername) {
       bridgeArgv.push("--session", account.sessionUsername);
     }
