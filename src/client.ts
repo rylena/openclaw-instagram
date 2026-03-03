@@ -1,5 +1,6 @@
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 import { normalizeInstagramMessagingTarget, normalizeInstagramUsername } from "./normalize.js";
 import { getInstagramRuntime } from "./runtime.js";
 import type { InstagramMessage, InstagramProbe, InstagramThread, ResolvedInstagramAccount } from "./types.js";
@@ -41,6 +42,17 @@ function buildInstagramCliArgv(
 ): string[] {
   const cliPath = account.cliPath.trim();
   const cliArgs = account.cliArgs ?? [];
+  const bridgePath = fileURLToPath(new URL("../scripts/instagram-bridge.ts", import.meta.url));
+  const dirFlagIndex = cliArgs.indexOf("--dir");
+  const cliDir =
+    dirFlagIndex >= 0 && dirFlagIndex + 1 < cliArgs.length ? String(cliArgs[dirFlagIndex + 1]) : "";
+  if (cliPath === "pnpm" && cliDir && cliArgs.includes("exec")) {
+    const bridgeArgv = [cliPath, "--dir", cliDir, "exec", "tsx", bridgePath, "--cli-dir", cliDir];
+    if (account.sessionUsername) {
+      bridgeArgv.push("--session", account.sessionUsername);
+    }
+    return [...bridgeArgv, ...args];
+  }
   if (/\.(mjs|cjs|js|ts|mts|cts)$/i.test(path.basename(cliPath))) {
     return [process.execPath, cliPath, ...cliArgs, ...args];
   }
@@ -82,23 +94,19 @@ async function runInstagramCli<T>(params: {
 }
 
 function withSessionUsername(account: ResolvedInstagramAccount, args: string[]): string[] {
-  return account.sessionUsername ? [...args, account.sessionUsername] : args;
+  return args;
 }
 
 export async function listInstagramThreads(
   account: ResolvedInstagramAccount,
   options?: { limit?: number },
 ): Promise<InstagramThread[]> {
-  const fields = "id,title,unread,lastActivity,usernames,lastMessageText";
   const { data } = await runInstagramCli<InstagramThread[]>({
     account,
     args: withSessionUsername(account, [
-      "llm",
       "threads",
       "--limit",
       String(options?.limit ?? 100),
-      "--fields",
-      fields,
     ]),
   });
   return data.map((thread) => ({
@@ -117,15 +125,11 @@ export async function listInstagramMessages(
   account: ResolvedInstagramAccount,
   params: { threadId: string; limit?: number; cursor?: string; since?: string },
 ): Promise<{ messages: InstagramMessage[]; cursor?: string }> {
-  const fields = "id,threadId,username,itemType,isOutgoing,timestamp,text";
   const args = [
-    "llm",
     "messages",
     params.threadId,
     "--limit",
     String(params.limit ?? 50),
-    "--fields",
-    fields,
   ];
   if (params.cursor) {
     args.push("--cursor", params.cursor);
@@ -158,7 +162,7 @@ export async function sendMessageInstagram(
   options: { account: ResolvedInstagramAccount; idempotencyKey?: string },
 ): Promise<{ messageId: string; target: string }> {
   const resolvedThreadId = await resolveInstagramThreadId(options.account, target);
-  const args = ["llm", "send", resolvedThreadId, text];
+  const args = ["send", resolvedThreadId, text];
   if (options.idempotencyKey) {
     args.push("--idempotency-key", options.idempotencyKey);
   }
@@ -184,7 +188,7 @@ export async function markInstagramThreadRead(
 ): Promise<void> {
   await runInstagramCli({
     account,
-    args: withSessionUsername(account, ["llm", "mark-read", threadId, itemId]),
+    args: withSessionUsername(account, ["mark-read", threadId, itemId]),
   });
 }
 
