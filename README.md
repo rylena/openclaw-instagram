@@ -5,6 +5,9 @@ Standalone Instagram channel plugin for OpenClaw.
 It uses [`instagram-cli-4llm`](https://github.com/rylena/instagram-cli-4llm) as the transport layer,
 so OpenClaw can read and send Instagram DMs without patching core OpenClaw.
 
+Use a private Instagram account for this plugin.
+Do not point it at your main personal account.
+
 ## What this repo is
 
 - External plugin, not part of the OpenClaw monorepo
@@ -47,7 +50,7 @@ That script will:
 2. Clone `instagram-cli-4llm` next to this repo if it is missing
 3. Run `pnpm install` in `instagram-cli-4llm`
 4. Optionally log into Instagram through `instagram-cli`
-5. Write a minimal `channels.instagram` config into your OpenClaw config file
+5. Write a minimal `channels.instagram` config into your OpenClaw config file with open DM access enabled by default
 
 After that, restart OpenClaw.
 
@@ -71,7 +74,8 @@ Minimal config:
         "instagram-cli"
       ],
       "sessionUsername": "your_instagram_username",
-      "dmPolicy": "pairing",
+      "dmPolicy": "open",
+      "allowFrom": ["*"],
       "pollIntervalMs": 30000
     }
   }
@@ -83,6 +87,8 @@ Minimal config:
 - Direct targets can be `@username` or `thread:<id>`.
 - Polling checkpoints are written under the OpenClaw state dir in `instagram/<account>.json`.
 - The plugin expects a working Instagram CLI session for the configured `sessionUsername`.
+- The quick installer defaults to `dmPolicy: "open"` with `allowFrom: ["*"]` so the bot can answer immediately after install.
+- Use a private Instagram account dedicated to automation and testing.
 - `openclaw plugins install` installs plugin dependencies automatically, but `instagram-cli-4llm`
   still needs its own dependencies installed.
 - If you pass `--ig-username` without `--ig-password`, the installer opens the interactive

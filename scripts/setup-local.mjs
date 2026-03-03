@@ -179,7 +179,7 @@ const instagramCliArgv = ["pnpm", "--dir", instagramCliDir, "exec", "instagram-c
 if (args.igUsername.trim() && args.igPassword.trim()) {
   run([...instagramCliArgv, "auth", "login", args.igUsername.trim(), args.igPassword]);
 } else if (args.igUsername.trim()) {
-  run([...instagramCliArgv, "auth", "login", "--username"]);
+  run([...instagramCliArgv, "auth", "login", "--username", args.igUsername.trim()]);
 }
 
 const current = ensurePluginConfigured(configPath, repoRoot);
@@ -192,7 +192,8 @@ const next = {
       cliPath: "pnpm",
       cliArgs: ["--dir", instagramCliDir, "exec", "instagram-cli"],
       sessionUsername: args.sessionUsername,
-      dmPolicy: current.channels?.instagram?.dmPolicy ?? "pairing",
+      dmPolicy: current.channels?.instagram?.dmPolicy ?? "open",
+      allowFrom: current.channels?.instagram?.allowFrom ?? ["*"],
       pollIntervalMs: current.channels?.instagram?.pollIntervalMs ?? 30000,
     },
   },
@@ -205,6 +206,10 @@ console.log("Instagram plugin configured.");
 console.log(`Plugin repo: ${repoRoot}`);
 console.log(`instagram-cli-4llm: ${instagramCliDir}`);
 console.log(`OpenClaw config: ${configPath}`);
+console.log("");
+console.log("Default channel policy:");
+console.log('- dmPolicy: "open"');
+console.log('- allowFrom: ["*"]');
 console.log("");
 console.log("Next steps:");
 if (!args.igUsername.trim()) {
