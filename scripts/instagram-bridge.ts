@@ -55,9 +55,9 @@ function readOption(args: string[], name: string): string | undefined {
 }
 
 async function createClient(cliDir: string, sessionUsername: string) {
-  const clientUrl = pathToFileURL(path.join(cliDir, "source", "client.ts")).href;
-  const configUrl = pathToFileURL(path.join(cliDir, "source", "config.ts")).href;
-  const sessionUrl = pathToFileURL(path.join(cliDir, "source", "session.ts")).href;
+  const clientUrl = pathToFileURL(path.join(cliDir, "dist", "client.js")).href;
+  const configUrl = pathToFileURL(path.join(cliDir, "dist", "config.js")).href;
+  const sessionUrl = pathToFileURL(path.join(cliDir, "dist", "session.js")).href;
 
   const [{ InstagramClient }, { ConfigManager }, { SessionManager }] = await Promise.all([
     import(clientUrl),
