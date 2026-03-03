@@ -130,6 +130,31 @@ function saveJson(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+function ensurePluginConfigured(configPath, repoRoot) {
+  const current = loadJson(configPath);
+  const existingPaths = Array.isArray(current.plugins?.load?.paths)
+    ? current.plugins.load.paths.filter((value) => typeof value === "string" && value.trim())
+    : [];
+  const nextPaths = Array.from(new Set([...existingPaths, repoRoot]));
+  return {
+    ...current,
+    plugins: {
+      ...current.plugins,
+      load: {
+        ...current.plugins?.load,
+        paths: nextPaths,
+      },
+      entries: {
+        ...current.plugins?.entries,
+        instagram: {
+          ...(current.plugins?.entries?.instagram ?? {}),
+          enabled: true,
+        },
+      },
+    },
+  };
+}
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = parseArgs(process.argv.slice(2));
 const instagramCliDir = path.resolve(
@@ -137,17 +162,10 @@ const instagramCliDir = path.resolve(
 );
 const configPath = path.resolve(args.configPath || resolveDefaultConfigPath());
 
-const installArgv = ["plugins", "install"];
-if (args.link) {
-  installArgv.push("--link");
-}
-installArgv.push(repoRoot);
-
 runFirstAvailable([
-  ["openclaw", ...installArgv],
-  ["pnpm", "openclaw", ...installArgv],
-  ["npx", "openclaw", ...installArgv],
-]);
+  ["npm", "install", "--omit=dev"],
+  ["pnpm", "install", "--prod", "--ignore-workspace"],
+], { cwd: repoRoot });
 
 if (!args.skipCliInstall) {
   if (!fs.existsSync(instagramCliDir)) {
@@ -164,7 +182,7 @@ if (args.igUsername.trim() && args.igPassword.trim()) {
   run([...instagramCliArgv, "auth", "login", "--username", args.igUsername.trim()]);
 }
 
-const current = loadJson(configPath);
+const current = ensurePluginConfigured(configPath, repoRoot);
 const next = {
   ...current,
   channels: {
