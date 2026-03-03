@@ -1,6 +1,5 @@
 import path from "node:path";
 import process from "node:process";
-import { runPluginCommandWithTimeout } from "openclaw/plugin-sdk";
 import { normalizeInstagramMessagingTarget, normalizeInstagramUsername } from "./normalize.js";
 import { getInstagramRuntime } from "./runtime.js";
 import type { InstagramMessage, InstagramProbe, InstagramThread, ResolvedInstagramAccount } from "./types.js";
@@ -54,12 +53,12 @@ async function runInstagramCli<T>(params: {
   timeoutMs?: number;
 }): Promise<{ data: T; meta?: Record<string, unknown> }> {
   const argv = buildInstagramCliArgv(params.account, params.args);
-  const result = await runPluginCommandWithTimeout({
-    argv,
+  const result = await getInstagramRuntime().system.runCommandWithTimeout(argv, {
     cwd: params.account.cwd,
     timeoutMs: params.timeoutMs ?? 60_000,
   });
-  if (result.code !== 0) {
+  const code = result.code ?? 1;
+  if (code !== 0) {
     throw new Error(result.stderr.trim() || result.stdout.trim() || `command failed: ${argv[0]}`);
   }
   let parsed: Envelope<T>;
