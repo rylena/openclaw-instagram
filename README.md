@@ -86,4 +86,4 @@ Minimal config:
 - `openclaw plugins install` installs plugin dependencies automatically, but `instagram-cli-4llm`
   still needs its own dependencies installed.
 - If you pass `--ig-username` without `--ig-password`, the installer opens the interactive
-  Instagram CLI login flow.
+  Instagram CLI login form.

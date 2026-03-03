@@ -177,9 +177,9 @@ if (!args.skipCliInstall) {
 const instagramCliArgv = ["pnpm", "--dir", instagramCliDir, "exec", "instagram-cli"];
 
 if (args.igUsername.trim() && args.igPassword.trim()) {
-  run([...instagramCliArgv, "auth", "login", "--username", args.igUsername.trim(), args.igPassword]);
+  run([...instagramCliArgv, "auth", "login", args.igUsername.trim(), args.igPassword]);
 } else if (args.igUsername.trim()) {
-  run([...instagramCliArgv, "auth", "login", "--username", args.igUsername.trim()]);
+  run([...instagramCliArgv, "auth", "login", "--username"]);
 }
 
 const current = ensurePluginConfigured(configPath, repoRoot);
@@ -209,7 +209,7 @@ console.log("");
 console.log("Next steps:");
 if (!args.igUsername.trim()) {
   console.log(
-    `1. Log into instagram-cli: ${instagramCliArgv.join(" ")} auth login --username ${args.sessionUsername}`,
+    `1. Log into instagram-cli: ${instagramCliArgv.join(" ")} auth login --username`,
   );
   console.log("2. Restart OpenClaw.");
   console.log("3. Test an Instagram DM.");
