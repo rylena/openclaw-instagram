@@ -84,10 +84,13 @@ async function createClient(cliDir: string, sessionUsername: string) {
   }
 
   const client = new InstagramClient(username);
-  const loginResult = await client.loginBySession({ initializeRealtime: false });
-  if (!loginResult.success) {
-    throw new Error(loginResult.error ?? "Instagram session login failed");
+  const ig = client.getInstagramClient();
+  const sessionData = await sessionManager.loadSession();
+  if (!sessionData) {
+    throw new Error(`No Instagram session data found for ${username}`);
   }
+  ig.state.generateDevice(username);
+  await ig.state.deserialize(sessionData);
 
   return { client, username };
 }
