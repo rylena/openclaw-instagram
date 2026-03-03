@@ -163,7 +163,7 @@ const instagramCliDir = path.resolve(
 const configPath = path.resolve(args.configPath || resolveDefaultConfigPath());
 
 runFirstAvailable([
-  ["npm", "install", "--omit=dev"],
+  ["npm", "install", "--omit=dev", "--legacy-peer-deps"],
   ["pnpm", "install", "--prod", "--ignore-workspace"],
 ], { cwd: repoRoot });
 
