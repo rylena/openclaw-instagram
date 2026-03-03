@@ -1,12 +1,8 @@
 import {
   createNormalizedOutboundDeliverer,
   createReplyPrefixOptions,
-  createScopedPairingAccess,
   formatTextWithAttachmentLinks,
   logInboundDrop,
-  readStoreAllowFromForDmPolicy,
-  resolveControlCommandGate,
-  resolveEffectiveAllowFromLists,
   resolveOutboundMediaUrls,
   type OpenClawConfig,
   type OutboundReplyPayload,
@@ -28,19 +24,75 @@ import type { CoreConfig, InstagramInboundMessage, ResolvedInstagramAccount } fr
 
 const CHANNEL_ID = "instagram" as const;
 
+function normalizeStringList(entries: Array<string | number> | null | undefined): string[] {
+  return Array.from(
+    new Set(
+      (Array.isArray(entries) ? entries : [])
+        .map((entry) => String(entry).trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function resolveControlCommandGateCompat(params: {
+  useAccessGroups: boolean;
+  authorizers: Array<{ configured: boolean; allowed: boolean }>;
+  allowTextCommands: boolean;
+  hasControlCommand: boolean;
+}): { commandAuthorized: boolean; shouldBlock: boolean } {
+  const commandAuthorized = params.useAccessGroups
+    ? params.authorizers.some((entry) => entry.configured && entry.allowed)
+    : true;
+  return {
+    commandAuthorized,
+    shouldBlock: params.allowTextCommands && params.hasControlCommand && !commandAuthorized,
+  };
+}
+
+async function readStoreAllowFromForDmPolicyCompat(params: {
+  dmPolicy?: string | null;
+  core: ReturnType<typeof getInstagramRuntime>;
+  accountId: string;
+}): Promise<string[]> {
+  if (params.dmPolicy === "allowlist") {
+    return [];
+  }
+  try {
+    const values = await params.core.channel.pairing.readAllowFromStore({
+      channel: CHANNEL_ID,
+      accountId: params.accountId,
+    });
+    return normalizeStringList(values);
+  } catch {
+    return [];
+  }
+}
+
+function createScopedPairingAccessCompat(params: {
+  core: ReturnType<typeof getInstagramRuntime>;
+  accountId: string;
+}) {
+  return {
+    upsertPairingRequest: (input: { id: string; meta?: { name?: string } }) =>
+      params.core.channel.pairing.upsertPairingRequest({
+        channel: CHANNEL_ID,
+        accountId: params.accountId,
+        ...input,
+      }),
+  };
+}
+
 function resolveInstagramEffectiveAllowlists(params: {
   configAllowFrom: string[];
   configGroupAllowFrom: string[];
   storeAllowList: string[];
   dmPolicy: string;
 }) {
-  const { effectiveAllowFrom, effectiveGroupAllowFrom } = resolveEffectiveAllowFromLists({
-    allowFrom: params.configAllowFrom,
-    groupAllowFrom: params.configGroupAllowFrom,
-    storeAllowFrom: params.storeAllowList,
-    dmPolicy: params.dmPolicy,
-    groupAllowFromFallbackToAllowFrom: false,
-  });
+  const effectiveAllowFrom = normalizeStringList([
+    ...params.configAllowFrom,
+    ...(params.dmPolicy === "allowlist" ? [] : params.storeAllowList),
+  ]);
+  const effectiveGroupAllowFrom = normalizeStringList(params.configGroupAllowFrom);
   return { effectiveAllowFrom, effectiveGroupAllowFrom };
 }
 
@@ -86,15 +138,14 @@ export async function handleInstagramInbound(params: {
     return;
   }
 
-  const storeAllowList = await readStoreAllowFromForDmPolicy({
-    channel: CHANNEL_ID,
+  const storeAllowList = await readStoreAllowFromForDmPolicyCompat({
+    dmPolicy: account.config.dmPolicy ?? "pairing",
+    core,
     accountId: account.accountId,
-    cfg: config as OpenClawConfig,
   });
-  const pairing = createScopedPairingAccess({
-    channel: CHANNEL_ID,
+  const pairing = createScopedPairingAccessCompat({
+    core,
     accountId: account.accountId,
-    env: process.env,
   });
   const configAllowFrom = normalizeInstagramAllowlist(account.config.allowFrom);
   const configGroupAllowFrom = normalizeInstagramAllowlist(account.config.groupAllowFrom);
@@ -135,7 +186,7 @@ export async function handleInstagramInbound(params: {
     message,
   }).allowed;
   const hasControlCommand = core.channel.text.hasControlCommand(rawBody, config as OpenClawConfig);
-  const commandGate = resolveControlCommandGate({
+  const commandGate = resolveControlCommandGateCompat({
     useAccessGroups,
     authorizers: [
       {
