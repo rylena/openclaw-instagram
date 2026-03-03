@@ -2,9 +2,16 @@ import { normalizeResolvedSecretInputString } from "openclaw/plugin-sdk";
 import {
   DEFAULT_ACCOUNT_ID,
   normalizeAccountId,
-  normalizeOptionalAccountId,
 } from "openclaw/plugin-sdk/account-id";
 import type { CoreConfig, InstagramAccountConfig, ResolvedInstagramAccount } from "./types.js";
+
+function normalizeOptionalInstagramAccountId(value?: string | null): string | null {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (!trimmed) {
+    return null;
+  }
+  return normalizeAccountId(trimmed);
+}
 
 function resolveAccountConfig(
   cfg: CoreConfig,
@@ -51,7 +58,7 @@ export function listInstagramAccountIds(cfg: CoreConfig): string[] {
 }
 
 export function resolveDefaultInstagramAccountId(cfg: CoreConfig): string {
-  const requested = normalizeOptionalAccountId(cfg.channels?.instagram?.defaultAccount);
+  const requested = normalizeOptionalInstagramAccountId(cfg.channels?.instagram?.defaultAccount);
   if (requested) {
     return requested;
   }
@@ -62,7 +69,9 @@ export function resolveInstagramAccount(params: {
   cfg: CoreConfig;
   accountId?: string | null;
 }): ResolvedInstagramAccount {
-  const accountId = normalizeOptionalAccountId(params.accountId) ?? resolveDefaultInstagramAccountId(params.cfg);
+  const accountId =
+    normalizeOptionalInstagramAccountId(params.accountId) ??
+    resolveDefaultInstagramAccountId(params.cfg);
   const config = mergeInstagramAccountConfig(params.cfg, accountId);
   const cliPath = normalizeResolvedSecretInputString({
     value: config.cliPath,
