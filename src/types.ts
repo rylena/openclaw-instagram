@@ -117,3 +117,23 @@ export type InstagramPollState = {
   >;
   lastPollAt?: number;
 };
+
+export type InstagramRealtimeEnvelope =
+  | {
+      type: "ready";
+      sessionUsername: string;
+    }
+  | {
+      type: "message";
+      data: {
+        messageId: string;
+        threadId: string;
+        senderUsername: string;
+        text: string;
+        timestamp: number;
+      };
+    }
+  | {
+      type: "error";
+      message: string;
+    };

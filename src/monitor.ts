@@ -1,10 +1,20 @@
+import { spawn } from "node:child_process";
 import path from "node:path";
+import readline from "node:readline";
+import { fileURLToPath } from "node:url";
 import { createLoggerBackedRuntime, readJsonFileWithFallback, writeJsonFileAtomically, type RuntimeEnv } from "openclaw/plugin-sdk";
 import { resolveInstagramAccount } from "./accounts.js";
 import { listInstagramMessages, listInstagramThreads, markInstagramThreadRead } from "./client.js";
 import { handleInstagramInbound } from "./inbound.js";
 import { getInstagramRuntime } from "./runtime.js";
-import type { CoreConfig, InstagramAccountConfig, InstagramInboundMessage, InstagramPollState } from "./types.js";
+import type {
+  CoreConfig,
+  InstagramAccountConfig,
+  InstagramInboundMessage,
+  InstagramPollState,
+  InstagramRealtimeEnvelope,
+  ResolvedInstagramAccount,
+} from "./types.js";
 
 export type InstagramMonitorOptions = {
   accountId?: string;
@@ -39,6 +49,177 @@ async function waitForDelay(ms: number, signal?: AbortSignal) {
     };
     signal?.addEventListener("abort", onAbort, { once: true });
   });
+}
+
+function buildInstagramRealtimeWatchArgv(account: ResolvedInstagramAccount): string[] | null {
+  const cliPath = account.cliPath.trim();
+  const cliArgs = account.cliArgs ?? [];
+  const dirFlagIndex = cliArgs.indexOf("--dir");
+  const cliDir =
+    dirFlagIndex >= 0 && dirFlagIndex + 1 < cliArgs.length ? String(cliArgs[dirFlagIndex + 1]) : "";
+  if (!(cliPath === "pnpm" && cliDir && cliArgs.includes("exec"))) {
+    return null;
+  }
+  const watchPath = fileURLToPath(new URL("../scripts/instagram-watch.ts", import.meta.url));
+  const argv = [
+    cliPath,
+    "--dir",
+    cliDir,
+    "exec",
+    "ts-node",
+    "--esm",
+    watchPath,
+    "--cli-dir",
+    cliDir,
+  ];
+  if (account.sessionUsername) {
+    argv.push("--session", account.sessionUsername);
+  }
+  return argv;
+}
+
+async function monitorInstagramRealtimeProvider(params: {
+  account: ResolvedInstagramAccount;
+  cfg: CoreConfig;
+  runtime: RuntimeEnv;
+  statusSink?: InstagramMonitorOptions["statusSink"];
+  abortSignal?: AbortSignal;
+}) {
+  const core = getInstagramRuntime();
+  const logger = core.logging.getChildLogger({
+    channel: "instagram",
+    accountId: params.account.accountId,
+    mode: "realtime",
+  });
+  const argv = buildInstagramRealtimeWatchArgv(params.account);
+  if (!argv) {
+    return null;
+  }
+
+  const child = spawn(argv[0]!, argv.slice(1), {
+    cwd: params.account.cwd,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  let exited = false;
+  let ready = false;
+  let queue = Promise.resolve();
+  let threadCache = new Map<string, { usernames: string[]; title?: string }>();
+  let threadCacheLoadedAt = 0;
+
+  const refreshThreadCache = async () => {
+    const now = Date.now();
+    if (now - threadCacheLoadedAt < 60_000 && threadCache.size > 0) {
+      return;
+    }
+    const threads = await listInstagramThreads(params.account, { limit: 50 }).catch(() => []);
+    threadCache = new Map(
+      threads.map((thread) => [thread.id, { usernames: thread.usernames, title: thread.title }]),
+    );
+    threadCacheLoadedAt = now;
+  };
+  const waitForReady = new Promise<void>((resolve, reject) => {
+    const onExit = () => {
+      exited = true;
+      reject(new Error("Instagram realtime watcher exited before ready"));
+    };
+    child.once("exit", onExit);
+
+    const stdout = readline.createInterface({ input: child.stdout! });
+    stdout.on("line", (line) => {
+      let parsed: InstagramRealtimeEnvelope;
+      try {
+        parsed = JSON.parse(line) as InstagramRealtimeEnvelope;
+      } catch {
+        return;
+      }
+      if (parsed.type === "ready") {
+        ready = true;
+        child.off("exit", onExit);
+        logger.info(`[${params.account.accountId}] Instagram realtime connected (${parsed.sessionUsername})`);
+        resolve();
+        return;
+      }
+      if (parsed.type === "error" && !ready) {
+        child.off("exit", onExit);
+        reject(new Error(parsed.message));
+        return;
+      }
+      if (parsed.type !== "message") {
+        return;
+      }
+      queue = queue
+        .catch(() => {})
+        .then(async () => {
+          await refreshThreadCache();
+          const thread = threadCache.get(parsed.data.threadId);
+          const inbound: InstagramInboundMessage = {
+            messageId: parsed.data.messageId,
+            threadId: parsed.data.threadId,
+            target: parsed.data.threadId,
+            senderUsername: parsed.data.senderUsername,
+            text: parsed.data.text,
+            timestamp: parsed.data.timestamp,
+            isGroup: (thread?.usernames.length ?? 0) > 1,
+            usernames: thread?.usernames ?? [],
+            title: thread?.title,
+          };
+          core.channel.activity.record({
+            channel: "instagram",
+            accountId: params.account.accountId,
+            direction: "inbound",
+            at: parsed.data.timestamp,
+          });
+          params.statusSink?.({
+            lastPollAt: Date.now(),
+            lastInboundAt: parsed.data.timestamp,
+            lastError: null,
+          });
+          await handleInstagramInbound({
+            message: inbound,
+            account: params.account,
+            config: params.cfg,
+            runtime: params.runtime,
+            statusSink: params.statusSink,
+          });
+          await markInstagramThreadRead(
+            params.account,
+            parsed.data.threadId,
+            parsed.data.messageId,
+          ).catch(() => {});
+        })
+        .catch((error) => {
+          logger.error(`[${params.account.accountId}] Instagram realtime dispatch error: ${String(error)}`);
+        });
+    });
+  });
+
+  child.stderr?.on("data", (chunk) => {
+    const text = String(chunk).trim();
+    if (text) {
+      logger.warn(`[${params.account.accountId}] instagram realtime stderr: ${text}`);
+    }
+  });
+
+  params.abortSignal?.addEventListener(
+    "abort",
+    () => {
+      if (!exited) {
+        child.kill("SIGTERM");
+      }
+    },
+    { once: true },
+  );
+
+  await waitForReady;
+
+  return {
+    stop: () => {
+      if (!exited) {
+        child.kill("SIGTERM");
+      }
+    },
+  };
 }
 
 function resolveThreadScanLimit(config: InstagramAccountConfig): number {
@@ -102,6 +283,17 @@ export async function monitorInstagramProvider(
 
   if (!account.configured) {
     throw new Error(`Instagram is not configured for account "${account.accountId}".`);
+  }
+
+  const realtimeMonitor = await monitorInstagramRealtimeProvider({
+    account,
+    cfg,
+    runtime,
+    statusSink: opts.statusSink,
+    abortSignal: opts.abortSignal,
+  }).catch(() => null);
+  if (realtimeMonitor) {
+    return realtimeMonitor;
   }
 
   const logger = core.logging.getChildLogger({
