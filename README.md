@@ -13,6 +13,28 @@ so OpenClaw can read and send Instagram DMs without patching core OpenClaw.
 
 ## Fast local install
 
+One-shot installer:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/rylena/openclaw-instagram/main/install.sh) \
+  --session-username YOUR_INSTAGRAM_SESSION \
+  --ig-username YOUR_INSTAGRAM_USERNAME
+```
+
+For non-interactive login:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/rylena/openclaw-instagram/main/install.sh) \
+  --session-username YOUR_INSTAGRAM_SESSION \
+  --ig-username YOUR_INSTAGRAM_USERNAME \
+  --ig-password 'YOUR_INSTAGRAM_PASSWORD'
+```
+
+The installer will clone/update this repo into `~/.openclaw/plugins-src/openclaw-instagram`, then
+run the local setup flow.
+
+## Local repo install
+
 Clone this repo somewhere local, then run:
 
 ```bash
@@ -24,7 +46,8 @@ That script will:
 1. Link this plugin into OpenClaw with `openclaw plugins install --link`
 2. Clone `instagram-cli-4llm` next to this repo if it is missing
 3. Run `pnpm install` in `instagram-cli-4llm`
-4. Write a minimal `channels.instagram` config into your OpenClaw config file
+4. Optionally log into Instagram through `instagram-cli`
+5. Write a minimal `channels.instagram` config into your OpenClaw config file
 
 After that, restart OpenClaw.
 
@@ -62,3 +85,5 @@ Minimal config:
 - The plugin expects a working Instagram CLI session for the configured `sessionUsername`.
 - `openclaw plugins install` installs plugin dependencies automatically, but `instagram-cli-4llm`
   still needs its own dependencies installed.
+- If you pass `--ig-username` without `--ig-password`, the installer opens the interactive
+  Instagram CLI login flow.

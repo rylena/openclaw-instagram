@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 function parseArgs(argv) {
   const out = {
     sessionUsername: "",
+    igUsername: "",
+    igPassword: "",
     instagramCliDir: "",
     configPath: "",
     link: true,
@@ -28,6 +30,16 @@ function parseArgs(argv) {
     }
     if (arg === "--instagram-cli-dir") {
       out.instagramCliDir = argv[index + 1] ?? "";
+      index += 1;
+      continue;
+    }
+    if (arg === "--ig-username") {
+      out.igUsername = argv[index + 1] ?? "";
+      index += 1;
+      continue;
+    }
+    if (arg === "--ig-password") {
+      out.igPassword = argv[index + 1] ?? "";
       index += 1;
       continue;
     }
@@ -63,6 +75,8 @@ function printHelp() {
 
 Options:
   --instagram-cli-dir <path>   Path to instagram-cli-4llm
+  --ig-username <username>     Instagram username for login
+  --ig-password <password>     Instagram password for login
   --config <path>              OpenClaw config path
   --copy                       Install plugin by copy instead of --link
   --skip-cli-install           Skip cloning/installing instagram-cli-4llm deps
@@ -142,6 +156,14 @@ if (!args.skipCliInstall) {
   run(["pnpm", "install"], { cwd: instagramCliDir });
 }
 
+const instagramCliArgv = ["pnpm", "--dir", instagramCliDir, "exec", "instagram-cli"];
+
+if (args.igUsername.trim() && args.igPassword.trim()) {
+  run([...instagramCliArgv, "auth", "login", "--username", args.igUsername.trim(), args.igPassword]);
+} else if (args.igUsername.trim()) {
+  run([...instagramCliArgv, "auth", "login", "--username", args.igUsername.trim()]);
+}
+
 const current = loadJson(configPath);
 const next = {
   ...current,
@@ -167,6 +189,13 @@ console.log(`instagram-cli-4llm: ${instagramCliDir}`);
 console.log(`OpenClaw config: ${configPath}`);
 console.log("");
 console.log("Next steps:");
-console.log("1. Log into instagram-cli with your chosen session username if you have not already.");
-console.log("2. Restart OpenClaw.");
-console.log("3. Test an Instagram DM.");
+if (!args.igUsername.trim()) {
+  console.log(
+    `1. Log into instagram-cli: ${instagramCliArgv.join(" ")} auth login --username ${args.sessionUsername}`,
+  );
+  console.log("2. Restart OpenClaw.");
+  console.log("3. Test an Instagram DM.");
+} else {
+  console.log("1. Restart OpenClaw.");
+  console.log("2. Test an Instagram DM.");
+}
