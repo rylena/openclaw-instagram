@@ -1,0 +1,44 @@
+{
+  "name": "@rylena/openclaw-instagram",
+  "version": "2026.3.3",
+  "description": "Standalone OpenClaw Instagram channel plugin powered by instagram-cli-4llm",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "openclaw-instagram-setup": "./scripts/setup-local.mjs"
+  },
+  "scripts": {
+    "setup:local": "node ./scripts/setup-local.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "openclaw": "^2026.3.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "openclaw": {
+    "extensions": ["./index.ts"],
+    "channel": {
+      "id": "instagram",
+      "label": "Instagram",
+      "selectionLabel": "Instagram (instagram-cli)",
+      "detailLabel": "Instagram CLI",
+      "docsPath": "/channels/instagram",
+      "docsLabel": "instagram",
+      "blurb": "Instagram DMs and group threads through instagram-cli-4llm.",
+      "order": 75,
+      "aliases": ["ig"]
+    },
+    "install": {
+      "localPath": ".",
+      "defaultChoice": "path"
+    }
+  }
+}
