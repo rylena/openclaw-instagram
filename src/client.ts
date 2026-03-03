@@ -231,6 +231,14 @@ export async function resolveInstagramThreadId(
   account: ResolvedInstagramAccount,
   target: string,
 ): Promise<string> {
+  const threads = await listInstagramThreads(account, { limit: 100 });
+  const trimmed = target.trim();
+  if (trimmed) {
+    const directMatch = threads.find((thread) => thread.id === trimmed);
+    if (directMatch) {
+      return directMatch.id;
+    }
+  }
   const normalized = normalizeInstagramMessagingTarget(target);
   if (!normalized) {
     throw new Error(`invalid Instagram target: ${target}`);
@@ -239,7 +247,6 @@ export async function resolveInstagramThreadId(
     return normalized.slice("thread:".length);
   }
   const username = normalized.slice("user:".length);
-  const threads = await listInstagramThreads(account, { limit: 100 });
   const match = threads.find((thread) => thread.usernames.includes(username));
   if (!match) {
     throw new Error(`could not resolve Instagram thread for @${username}`);
