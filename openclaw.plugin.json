@@ -3,10 +3,28 @@
   "name": "Instagram",
   "description": "Standalone OpenClaw Instagram channel plugin powered by instagram-cli-4llm",
   "version": "2026.3.3",
-  "channels": ["instagram"],
+  "channels": [
+    "instagram"
+  ],
+  "channelConfigs": {
+    "instagram": {
+      "id": "instagram",
+      "label": "Instagram",
+      "selectionLabel": "Instagram (plugin)",
+      "detailLabel": "Instagram CLI",
+      "docsPath": "/channels/instagram",
+      "docsLabel": "instagram",
+      "blurb": "routes Instagram DMs and group chats through instagram-cli LLM commands.",
+      "order": 75,
+      "schema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
   "configSchema": {
     "type": "object",
-    "additionalProperties": false,
+    "additionalProperties": true,
     "properties": {}
   }
 }

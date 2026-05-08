@@ -42,18 +42,18 @@ function buildInstagramCliArgv(
 ): string[] {
   const cliPath = account.cliPath.trim();
   const cliArgs = account.cliArgs ?? [];
-  const bridgePath = fileURLToPath(new URL("../scripts/instagram-bridge.ts", import.meta.url));
+  
+  // Use the compiled .js scripts in the dist/scripts folder.
+  // When running from dist/src/client.js, the bridge is at ../scripts/instagram-bridge.js
+  const bridgePath = fileURLToPath(new URL("../scripts/instagram-bridge.js", import.meta.url));
+  
   const dirFlagIndex = cliArgs.indexOf("--dir");
   const cliDir =
     dirFlagIndex >= 0 && dirFlagIndex + 1 < cliArgs.length ? String(cliArgs[dirFlagIndex + 1]) : "";
+    
   if (cliPath === "pnpm" && cliDir && cliArgs.includes("exec")) {
     const bridgeArgv = [
-      cliPath,
-      "--dir",
-      cliDir,
-      "exec",
-      "ts-node",
-      "--esm",
+      process.execPath, // Run with node directly
       bridgePath,
       "--cli-dir",
       cliDir,
@@ -63,6 +63,7 @@ function buildInstagramCliArgv(
     }
     return [...bridgeArgv, ...args];
   }
+  
   if (/\.(mjs|cjs|js|ts|mts|cts)$/i.test(path.basename(cliPath))) {
     return [process.execPath, cliPath, ...cliArgs, ...args];
   }

@@ -7,7 +7,7 @@ import {
   type OpenClawConfig,
   type OutboundReplyPayload,
   type RuntimeEnv,
-} from "openclaw/plugin-sdk";
+} from "./sdk-compat.js";
 import {
   normalizeInstagramAllowlist,
   normalizeInstagramUsername,

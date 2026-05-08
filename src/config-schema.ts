@@ -7,7 +7,7 @@ import {
   ReplyRuntimeConfigSchemaShape,
   ToolPolicySchema,
   requireOpenAllowFrom,
-} from "openclaw/plugin-sdk";
+} from "./sdk-compat.js";
 import { z } from "zod";
 
 const InstagramGroupSchema = z

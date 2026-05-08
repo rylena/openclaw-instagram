@@ -1,5 +1,5 @@
-import type { BaseProbeResult } from "openclaw/plugin-sdk";
 import type {
+  BaseProbeResult,
   BlockStreamingCoalesceConfig,
   DmConfig,
   DmPolicy,
@@ -8,7 +8,7 @@ import type {
   GroupToolPolicyConfig,
   MarkdownConfig,
   OpenClawConfig,
-} from "openclaw/plugin-sdk";
+} from "./sdk-compat.js";
 
 export type InstagramGroupConfig = {
   requireMention?: boolean;
