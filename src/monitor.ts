@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import readline from "node:readline";
 import { fileURLToPath } from "node:url";
-import { createLoggerBackedRuntime, readJsonFileWithFallback, writeJsonFileAtomically, type RuntimeEnv } from "openclaw/plugin-sdk";
+import { createLoggerBackedRuntime, readJsonFileWithFallback, writeJsonFileAtomically, type RuntimeEnv } from "./sdk-compat.js";
 import { resolveInstagramAccount } from "./accounts.js";
 import { listInstagramMessages, listInstagramThreads, markInstagramThreadRead } from "./client.js";
 import { handleInstagramInbound } from "./inbound.js";
@@ -57,17 +57,17 @@ function buildInstagramRealtimeWatchArgv(account: ResolvedInstagramAccount): str
   const dirFlagIndex = cliArgs.indexOf("--dir");
   const cliDir =
     dirFlagIndex >= 0 && dirFlagIndex + 1 < cliArgs.length ? String(cliArgs[dirFlagIndex + 1]) : "";
+    
   if (!(cliPath === "pnpm" && cliDir && cliArgs.includes("exec"))) {
     return null;
   }
-  const watchPath = fileURLToPath(new URL("../scripts/instagram-watch.ts", import.meta.url));
+  
+  // Use the compiled .js scripts in the dist/scripts folder.
+  // When running from dist/src/monitor.js, the watch script is at ../scripts/instagram-watch.js
+  const watchPath = fileURLToPath(new URL("../scripts/instagram-watch.js", import.meta.url));
+  
   const argv = [
-    cliPath,
-    "--dir",
-    cliDir,
-    "exec",
-    "ts-node",
-    "--esm",
+    process.execPath, // Run with node directly
     watchPath,
     "--cli-dir",
     cliDir,
@@ -96,6 +96,8 @@ async function monitorInstagramRealtimeProvider(params: {
     return null;
   }
 
+  logger.info(`[${params.account.accountId}] Starting Instagram realtime watcher: ${argv.join(" ")}`);
+
   const child = spawn(argv[0]!, argv.slice(1), {
     cwd: params.account.cwd,
     stdio: ["ignore", "pipe", "pipe"],
@@ -119,9 +121,9 @@ async function monitorInstagramRealtimeProvider(params: {
     threadCacheLoadedAt = now;
   };
   const waitForReady = new Promise<void>((resolve, reject) => {
-    const onExit = () => {
+    const onExit = (code: number | null) => {
       exited = true;
-      reject(new Error("Instagram realtime watcher exited before ready"));
+      reject(new Error(`Instagram realtime watcher exited with code ${code} before ready`));
     };
     child.once("exit", onExit);
 
@@ -137,6 +139,7 @@ async function monitorInstagramRealtimeProvider(params: {
         ready = true;
         child.off("exit", onExit);
         logger.info(`[${params.account.accountId}] Instagram realtime connected (${parsed.sessionUsername})`);
+        console.log(`[instagram][${params.account.accountId}] realtime connected (${parsed.sessionUsername})`);
         resolve();
         return;
       }
@@ -285,6 +288,13 @@ export async function monitorInstagramProvider(
     throw new Error(`Instagram is not configured for account "${account.accountId}".`);
   }
 
+  const logger = core.logging.getChildLogger({
+    channel: "instagram",
+    accountId: account.accountId,
+  });
+
+  logger.info(`[${account.accountId}] Starting Instagram monitor (account: ${account.sessionUsername || "default"})`);
+
   const realtimeMonitor = await monitorInstagramRealtimeProvider({
     account,
     cfg,
@@ -296,10 +306,6 @@ export async function monitorInstagramProvider(
     return realtimeMonitor;
   }
 
-  const logger = core.logging.getChildLogger({
-    channel: "instagram",
-    accountId: account.accountId,
-  });
   const stateFile = resolveStateFile(account.accountId);
   const threadScanLimit = resolveThreadScanLimit(account.config);
   const messageScanLimit = resolveMessageScanLimit(account.config);
